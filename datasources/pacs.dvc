@@ -1,0 +1,5 @@
+outs:
+- md5: f389282281e573fd0c8a856d443bbd5d.dir
+  size: 198645370
+  nfiles: 377
+  path: pacs

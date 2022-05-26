@@ -1,0 +1,7 @@
+[core]
+    remote = minio
+['remote "minio"']
+    url = s3://ctbrain-data
+    endpointurl = http://156.253.5.38:9000
+    access_key_id = minio
+    secret_access_key = miniostorage
