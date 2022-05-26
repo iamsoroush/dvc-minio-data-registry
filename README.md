@@ -1,2 +1,23 @@
 # dvc-minio-data-registry
 A sample repository for using as a data registry which handles versioning the data using DVC and uses a minIO S3 object-storage.
+
+# Set-up
+1. `pip install -r requirements.txt`
+2. `dvc init`
+3. `dvc remote add -d minio s3://ctbrain-data -f`
+4. `dvc remote modify minio endpointurl http://156.253.5.38:9000`
+5. `dvc remote modify minio access_key_id my_login`
+6. `dvc remote modify minio secret_access_key my_password`
+
+# Add a data-source
+1. define your data-source name and the path to the data, which is a folder containing Dicom Studies, which are collections of dicom files.
+2. `python add_to_data_source.py run --src-dir "/Users/soroush/Datasets/CT Brain/local/Artifact" --datasource-name pacs`
+3. `dvc add "${DATA_ROOT}/${TARGET_DS_NAME}"`
+4. `dvc push`
+5. `git add "${DATA_ROOT}/*.dvc" "${DATA_ROOT}/.gitignore" .gitignore .dvcignore .dvc/config .dvc/.gitignore`
+6. `git commit .dvc/.gitignore .dvc/co
+nfig .dvcignore datasources/.gitignore datasources/pacs.dvc -m "add local_data/Artifact to pacs dataset in datasources"`
+7. `git tag ctbrain-init`
+8. `git push origin ctbrain-init`
+
+# Import a data--source
