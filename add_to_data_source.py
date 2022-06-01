@@ -19,6 +19,8 @@ class LinearFlow(FlowSpec):
                                 default=False)
     datasets_folder: str = "datasources"
 
+    ct_window_l: int = 40  # center of the window, for generating histogram values
+    ct_window_w: int = 300  # width of the window
 
     @step
     def start(self):
@@ -90,25 +92,24 @@ class LinearFlow(FlowSpec):
             if series_path.is_dir():
                 infos.append(get_series_info(series_path))
 
-        df = pd.DataFrame(infos)
-        df.to_csv(self.dst.joinpath('meta-data.csv'), index=False)
-        profile = ProfileReport(df, title=f"{self.data_source_name} DataSource's Profiling Report")
+        self.meta_data = pd.DataFrame(infos)
+        self.next(self.add_hu_histogram)
+
+    @step
+    def add_hu_histogram(self):
+
+        self.next(self.summarize_and_write_meta_data)
+
+    @step
+    def summarize_and_write_meta_data(self):
+        self.meta_data.to_csv(self.dst.joinpath('meta-data.csv'), index=False)
+        profile = ProfileReport(self.meta_data, title=f"{self.data_source_name} DataSource's Profiling Report")
         profile.to_file(self.dst.joinpath('meta-data-report.html'))
 
         self.next(self.push_to_remote)
 
     @step
     def push_to_remote(self):
-        # commands = list()
-        #
-        # commands.append(f'git add "{self.datasets_folder}/*.dvc" "{self.datasets_folder}/.gitignore" .gitignore .dvcignore .dvc/config .dvc/.gitignore')
-        # commands.append(f'git commit -m "track the {self.data_source_name} dataset in {self.datasets_folder}"')
-        # commands.append(f'dvc push')
-        #
-        # for cmd in commands:
-        #     stream = os.popen(cmd)
-        #     print(stream.read().strip())
-
         # cmd = f'DATA_ROOT="{self.datasets_folder}" TARGET_DS_NAME="{self.data_source_name}" ADDED_DS_PATH="{self.src_dir}" sh dvcpush.sh '
         # stream = os.popen(cmd)
         # print(stream.read().strip())

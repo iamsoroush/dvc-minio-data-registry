@@ -1,0 +1,5 @@
+datasources_path: datasources
+meta-data-name: meta-data
+meta-data-report-name: meta-data-report
+
+dicom-tags
