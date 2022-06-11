@@ -22,11 +22,17 @@ class AddLabelsPipeline(FlowSpec):
                               default=0.1)
 
     datasets_folder: Path = FILE_PATH.joinpath('datasources')
+    tasks_folder: Path = FILE_PATH.joinpath('tasks')
+
     seed: int = 0
 
     @step
     def start(self):
         """Start the pipeline"""
+
+        self.task_path = self.tasks_folder.joinpath(self.task_name)
+        self.task_path.mkdir(exist_ok=True)
+        self.task_meta_data_path = self.task_path.joinpath('meta-data.csv')
 
         self.csv_file = pd.read_csv(self.csv_file_path)
         print("loaded csv file: ", self.csv_file_path)
@@ -63,9 +69,9 @@ class AddLabelsPipeline(FlowSpec):
         datasources_df = pd.concat([pd.read_csv(self.datasets_folder.joinpath(ds).joinpath('meta-data.csv'),
                                                 index_col='SeriesInstanceUID') for ds in self.csv_file['DataSource'].unique()])
 
-        self.task_path = FILE_PATH.joinpath(self.task_name)
-        self.task_path.mkdir(exist_ok=True)
-        self.task_meta_data_path = self.task_path.joinpath('meta-data.csv')
+        # self.task_path = FILE_PATH.joinpath(self.task_name)
+        # self.task_path.mkdir(exist_ok=True)
+        # self.task_meta_data_path = self.task_path.joinpath('meta-data.csv')
 
         if self.task_meta_data_path.is_file():
             task_meta_data = pd.read_csv(self.task_meta_data_path)
@@ -102,6 +108,7 @@ class AddLabelsPipeline(FlowSpec):
         self.next(self.generate_report)
 
     def split_stratified(self):
+        # TODO: moodify to handle stratified splitting for multi-class and segmentation tasks
         unique_sids = self.new_meta_data['SeriesInstanceUID'].unique()
         labels = [self.new_meta_data[self.new_meta_data['SeriesInstanceUID'] == i]['Label'].values[0] for i in unique_sids.tolist()]
 

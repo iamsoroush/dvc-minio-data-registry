@@ -5,5 +5,5 @@
 dvc add "${DATA_ROOT}/${TARGET_DS_NAME}"
 dvc push
 git add "${DATA_ROOT}/*.dvc" "${DATA_ROOT}/.gitignore" .gitignore .dvcignore .dvc/config .dvc/.gitignore
-git commit -m "add ${ADDED_DS_PATH} to ${TARGET_DS_NAME} dataset in ${DATA_ROOT}"
+git commit -m "add ${TARGET_DS_NAME} datasource in ${DATA_ROOT}"
 #git push origin main

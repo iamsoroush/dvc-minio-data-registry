@@ -10,7 +10,7 @@ import pydicom
 from utils import get_qualified_series_id_for_study, anonymize, delete_folder_content, get_series_info
 
 
-class LinearFlow(FlowSpec):
+class DataRegistrationPipeline(FlowSpec):
     src_dir: str = Parameter('src-dir',
                              required=True)
     data_source_name: str = Parameter('datasource-name',
@@ -25,19 +25,50 @@ class LinearFlow(FlowSpec):
     @step
     def start(self):
         print("data source path: ", self.src_dir)
-        self.next(self.extract_qualified_series)
+        self.next(self.extract_study_paths)
 
+    @step
+    def extract_study_paths(self):
+        def walk_into_dir(p: Path):
+            paths = list(p.iterdir())
+            is_file = [i.is_file() for i in paths]
+            is_dcm_file = [i for i in paths if i.name.endswith('.dcm')]
+            is_dir = [i.is_dir() for i in paths]
+            is_empty = not any(paths)
+
+            if is_empty:
+                print(f'{p}: an empty directory')
+                return None
+            elif all(is_file) and any(is_dcm_file):
+                return [p]
+            elif any(is_dir):
+                study_paths = list()
+                for i in paths:
+                    if i.is_dir():
+                        res = walk_into_dir(i)
+                        if res is not None:
+                            study_paths.extend(res)
+                return study_paths
+            else:
+                print(f'{p}: else!')
+                return None
+
+        self.ds_dir = Path(self.src_dir)
+        self.study_paths = walk_into_dir(self.ds_dir)
+        print(f'extracted {len(self.study_paths)} studies.')
+        self.next(self.extract_qualified_series)
 
     @step
     def extract_qualified_series(self):
-        p = Path(self.src_dir)
-        # print(f'number of series: {len(list(p.iterdir()))}')
         self.qualified_series = {}
 
-        for study_path in p.iterdir():
+        for study_path in self.study_paths:
             series_ids = get_qualified_series_id_for_study(study_path)
+            print(f'{len(series_ids)} qualified series for {study_path.name}')
             if any(series_ids):
                 self.qualified_series[study_path] = series_ids[0]
+
+        print(f'extracted {len(self.qualified_series)} qualified series')
 
         self.next(self.copy_to_dst)
 
@@ -75,10 +106,8 @@ class LinearFlow(FlowSpec):
         for series_path in self.dst_series_paths:
             if series_path.is_dir():
                 print(f'anonymizing series {series_path.name}')
-                # anonymizer = dicognito.anonymizer.Anonymizer(id_prefix="AIMedic")
                 for dcm_file in series_path.iterdir():
                     with pydicom.dcmread(dcm_file) as dataset:
-                        # anonymizer.anonymize(dataset)
                         anonymize(dataset)
                     dataset.save_as(dcm_file, write_like_original=True)
 
@@ -118,13 +147,11 @@ class LinearFlow(FlowSpec):
 
     @step
     def end(self):
-        # print(f'qualified series: ')
-        # print(self.qualified_series)
-        # print('the data source path is still: %s' % self.data_src_path)
+        print('Done.')
         pass
 
 
 if __name__ == '__main__':
-    LinearFlow()
+    DataRegistrationPipeline()
 
 

@@ -9,29 +9,80 @@ from pydicom import dcmread
 
 def get_qualified_series_id_for_study(study_path: Path,
                                       min_dcm_files: int = 10,
-                                      min_slice_thickness: float = 4) -> typing.List[str]:
-    dcm_tags_to_check: dict = {'Modality': 'CT',
-                               'BodyPartExamined': 'HEAD'}
-    image_type_ = "AXIAL"
+                                      min_slice_thickness: float = 2,
+                                      target_image_type: str = 'AXIAL',
+                                      target_modality: str = 'CT',
+                                      target_bpe: str = 'HEAD') -> typing.List[str]:
 
     qualified = list()
     if study_path.is_dir():
         series_ids = sitk.ImageSeriesReader.GetGDCMSeriesIDs(str(study_path))
         for sid in series_ids:
             series_file_names = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(str(study_path), sid)
+
+            if not len(series_file_names) >= min_dcm_files:
+                continue
+
+            # Check minimum slices condition
             dcm_file = dcmread(series_file_names[0], stop_before_pixels=True)
 
             conditions = list()
-            for tag in dcm_tags_to_check:
-                conditions.append(eval('dcm_file.' + tag + '.upper()') == dcm_tags_to_check[tag].upper())
-            conditions.append(image_type_.upper() in [i.upper() for i in dcm_file.ImageType])
-            conditions.append(len(series_file_names) >= min_dcm_files)
-            conditions.append(float(dcm_file.SliceThickness) >= min_slice_thickness)
+
+            # Check the Modality condition
+            try:
+                modality = dcm_file.Modality
+                conditions.append(modality.upper() == target_modality.upper())
+            except AttributeError:
+                print(f'series {sid} in {study_path} does not contain the Modality tag. skipping.')
+                continue
+            except Exception as e:
+                print(f'exception while reading Modality tag from series {sid} in {study_path}, skipping: {e.args[0]}')
+                continue
+
+            # Check the BodyPartExamined condition
+            try:
+                bpe = dcm_file.BodyPartExamined
+                conditions.append(bpe.upper() == target_bpe.upper())
+            except AttributeError:
+                print(f'series {sid} in {study_path} does not contain the BodyPartExamined tag. skipping.')
+                continue
+            except Exception as e:
+                print(
+                    f'exception while reading BodyPartExamined tag from series {sid} in {study_path}, skipping: {e.args[0]}')
+                continue
+
+            # Check the ImageType for containing "AXIAL" condition
+            try:
+                conditions.append(target_image_type.upper() in [i.upper() for i in dcm_file.ImageType])
+            except Exception as e:
+                print(f'exception while checking ImageType tag from series {sid} in {study_path}, skipping: {e.args[0]}')
+                continue
+
+            # Check the SliceThickness condition
+            try:
+                conditions.append(float(dcm_file.SliceThickness) >= min_slice_thickness)
+            except Exception as e:
+                print(
+                    f'exception while checking SliceThickness tag from series {sid} in {study_path}, skipping: {e.args[0]}')
+                continue
 
             if all(conditions):
                 qualified.append(sid)
 
-    return qualified
+    if len(qualified) > 1:
+        head_qualified = list()
+        for sid in qualified:
+            series_file_names = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(str(study_path), sid)
+            dcm_file = dcmread(series_file_names[0], stop_before_pixels=True)
+            if 'head' in dcm_file.SeriesDescription.lower():
+                head_qualified.append(sid)
+
+        if any(head_qualified):
+            return head_qualified
+        else:
+            return qualified
+    else:
+        return qualified
 
 
 def anonymize(dataset: pydicom.Dataset):
@@ -71,6 +122,7 @@ def get_dicom_tags() -> list:
                   'SpatialResolution',
                   'PatientAge',
                   'PatientSex',
+                  'PatientID'
                   'ImagesInAcquisition',
                   'LossyImageCompression',
                   'SliceThickness',
